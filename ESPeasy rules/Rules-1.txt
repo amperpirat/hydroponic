@@ -1,0 +1,137 @@
+//Boot
+on System#Boot do
+ LogEntry,'Start Initialization ***************************************************'
+ TaskValueSet 9,1,0 //Water_timer_next
+ TaskValueSet 9,2,0 //Water_timer_next
+ TaskValueSet 10,1,7 //water_timer_status
+ TaskValueSet 11,1,0 //Water_timer_enable
+ TaskValueSet 12,1,300 //fill time is 6mins
+ TaskValueSet 12,2,600 //hold time is 10mins
+ TaskValueSet 12,3,360 //empty time is 6 mins
+ TaskValueSet 12,4,9480 //time to next cycle of 3h
+ GPIO,12,1 //switch off emptying pump
+ GPIO,13,1 //switch off filling pump
+ Let,1,0
+ Let,2,0
+ Let,4,1 //mark basin as not empty
+ timerSet,1,2
+endon
+
+on Rules#Timer=1 do //initial emptying the basin after reboot
+ TaskValueSet 10,1,5 //water_timer_status  
+ GPIO,12,0 //switch on emptying pump
+ timerSet,2,360 //******************************************* 360!
+endon
+
+on Rules#Timer=2 do
+ TaskValueSet 10,1,8 //water_timer_status  
+ GPIO,12,1 //switch off emptying pump
+ LoopTimerSet,4,1
+ Let,4,0 //mark basin as empty
+ LogEntry,'End Initialization ***************************************************
+endon
+//Boot end
+
+//Main Loop Timer for watering
+on Rules#Timer=3 do
+
+ //start filling process
+ if %eventvalue2% < [water_timer#time_fill] 
+  TaskvalueSet 9,1,"[water_timer#time_fill] - %eventvalue2%"
+  If [var#3] = 0
+   Let,4,1
+   Let,3,1
+   LogEntry,'Start filling phase ***************************************************
+   TaskValueSet 10,1,1
+   TaskValueSet 9,2,2
+   GPIO,12,1
+   GPIO,13,0
+  endif 
+ endif
+
+ //hold water in basin
+ if %eventvalue2% > [water_timer#time_fill] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] - %eventvalue2%"
+  If [var#3] = 1
+   Let,3,2
+   LogEntry,'Start holding phase ***************************************************
+   TaskValueSet 10,1,2
+   TaskValueSet 9,2,3
+   GPIO,12,1
+   GPIO,13,1
+  endif 
+ endif
+
+ //empty water
+ if %eventvalue2% > [water_timer#time_fill] + [water_timer#time_hold] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] - %eventvalue2%"
+  If [var#3] = 2
+   Let,3,3
+   LogEntry,'Start emptying phase ***************************************************
+   TaskValueSet 10,1,3
+   TaskValueSet 9,2,4
+   GPIO,12,0
+   GPIO,13,1
+  endif 
+ endif
+
+ //wait to next cycle
+ if %eventvalue2% > [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle] - %eventvalue2%"
+   If [var#3] = 3
+   Let,3,0
+   Let,4,0
+   LogEntry,'Start waiting phase ***************************************************
+   TaskValueSet 10,1,4
+   TaskValueSet 9,2,1
+   GPIO,12,1
+   GPIO,13,1
+  endif 
+ endif
+
+ if %eventvalue2% >= [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle]
+  LogEntry,'Start new cycle ***************************************************
+  LoopTimerSet,3,1
+ endif
+
+endon
+
+
+//enable/disable timer
+on Rules#Timer=4 do
+ if [water_timer_enable#enable] = 0 and [var#1] = 0  //disable automatic watering
+  LogEntry,"Automatic to be disabled ****************************"
+  TaskValueSet 10,1,6 //water_timer_status  
+  TaskValueSet 9,1,0 //water_timer_next
+  TaskValueSet 9,2,0 //water_timer_next  
+  Let,1,1
+  Let,2,0
+  TimerSet,3,0 //halt water timer
+  TimerSet,4,0 //lock enable/disable timer
+  If [var#4] = 1
+   TimerSet,5,2 //start emptying the basin
+  Elseif [var#4] = 0
+   TimerSet,6,1 //basin already empty -> jump directly to disable
+  endif
+ elseif [water_timer_enable#enable] = 1 and [var#2] = 0  //enable automatic watering
+  LogEntry,"Automatic to be enabled ****************************"
+  Let,1,0
+  Let,2,1
+  Let,3,0
+  LoopTimerSet,3,1
+ endif
+endon
+
+//safetly emptying basin prior disable state
+on Rules#Timer=5 do
+ LogEntry,'emptying basin for disable **********************************************'
+ GPIO,12,0 //switch on emptying pump
+ timerSet,6,360 //******************************************* 360!
+endon
+on Rules#Timer=6 do
+ LogEntry,'emptied basin for disable **********************************************'
+ TaskValueSet 10,1,0 //water_timer_status  
+ GPIO,12,1 //switch off emptying pump 
+ LoopTimerSet,4,1
+ Let,4,0
+endon

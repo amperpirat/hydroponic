@@ -1,0 +1,63 @@
+//Main Loop Timer for watering
+on Rules#Timer=3 do
+
+ //start filling process
+ if %eventvalue2% < [water_timer#time_fill] 
+  TaskvalueSet 9,1,"[water_timer#time_fill] - %eventvalue2%"
+  If [var#3] = 0
+   Let,4,1
+   Let,3,1
+   LogEntry,'Start filling phase'
+   TaskValueSet 10,1,1
+   TaskValueSet 9,2,2
+   GPIO,16,0
+   GPIO,17,1
+  endif 
+ endif
+
+ //hold water in basin
+ if %eventvalue2% > [water_timer#time_fill] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] - %eventvalue2%"
+  If [var#3] = 1
+   Let,3,2
+   LogEntry,'Start holding phase'
+   TaskValueSet 10,1,2
+   TaskValueSet 9,2,3
+   GPIO,16,0
+   GPIO,17,0
+  endif 
+ endif
+
+ //empty water
+ if %eventvalue2% > [water_timer#time_fill] + [water_timer#time_hold] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] - %eventvalue2%"
+  If [var#3] = 2
+   Let,3,3
+   LogEntry,'Start emptying phase'
+   TaskValueSet 10,1,3
+   TaskValueSet 9,2,4
+   GPIO,16,1
+   GPIO,17,0
+  endif 
+ endif
+
+ //wait to next cycle
+ if %eventvalue2% > [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] and %eventvalue2% < [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle]
+  TaskvalueSet 9,1,"[water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle] - %eventvalue2%"
+   If [var#3] = 3
+   Let,3,0
+   Let,4,0
+   LogEntry,'Start waiting phase' 
+   TaskValueSet 10,1,4
+   TaskValueSet 9,2,1
+   GPIO,16,0
+   GPIO,17,0
+  endif 
+ endif
+
+ if %eventvalue2% >= [water_timer#time_fill] + [water_timer#time_hold] + [water_timer#time_empty] + [water_timer#time_cycle]
+  LogEntry,'Start new cycle'
+  LoopTimerSet,3,1
+ endif
+
+endon

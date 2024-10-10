@@ -1,0 +1,40 @@
+//enable/disable timer
+on Rules#Timer=4 do
+ if [water_timer_enable#enable] = 0 and [var#1] = 0  //disable automatic watering
+  LogEntry,"Automatic to be disabled"
+  TaskValueSet 10,1,6 //water_timer_status  
+  TaskValueSet 9,1,0 //water_timer_next
+  TaskValueSet 9,2,0 //water_timer_next  
+  Let,1,1
+  Let,2,0
+  TimerSet,3,0 //halt water timer
+  TimerSet,4,0 //lock enable/disable timer
+  If [var#4] = 1
+   TimerSet,5,2 //start emptying the basin
+  Elseif [var#4] = 0
+   TimerSet,6,1 //basin already empty -> jump directly to disable
+  endif
+ elseif [water_timer_enable#enable] = 1 and [var#2] = 0  //enable automatic watering
+  LogEntry,"Automatic to be enabled"
+  Let,1,0
+  Let,2,1
+  Let,3,0
+  LoopTimerSet,3,1
+ endif
+endon
+
+//safetly emptying basin prior disable state
+on Rules#Timer=5 do
+ LogEntry,'emptying basin for disable'
+ GPIO,16,1 //switch on emptying pump
+ GPIO,17,0
+ timerSet,6,360 
+endon
+on Rules#Timer=6 do
+ LogEntry,'emptied basin for disable'
+ TaskValueSet 10,1,0 //water_timer_status  
+ GPIO,16,0 //switch off emptying pump 
+ GPIO,17,0 
+ LoopTimerSet,4,1
+ Let,4,0
+endon
