@@ -14,3 +14,13 @@ indoor hydroponic system to grow herbs and salad
 * MQTT for changing the timings, enable and disable the timer as well as monitoring the device
 * configuration pictures can be found under pictures
 
+# different status of the device
+* 0	disabled
+* 1	filling
+* 2	holding
+* 3	EMPTYING
+* 4	waiting
+* 5	inititial emptying
+* 6	disable emptying
+* 7	init
+* 8	init done
